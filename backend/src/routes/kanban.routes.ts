@@ -11,6 +11,7 @@ import {
   importLeadsFromCsvRows,
   moveLead,
   reorderStages,
+  sendLeadEmailWebhook,
   updateLeadInteractionStatus,
   updateLeadOpportunity,
   updateLeadProfile,
@@ -190,6 +191,15 @@ kanbanRoutes.post(
       proxima_acao_em: payload.proxima_acao_em ?? null,
     })
     res.status(201).json(inserted)
+  }),
+)
+
+kanbanRoutes.post(
+  '/leads/:leadId/send-email',
+  asyncHandler(async (req, res) => {
+    const { leadId } = idParamSchema.parse(req.params)
+    const result = await sendLeadEmailWebhook(req.userId!, leadId)
+    res.status(200).json(result)
   }),
 )
 

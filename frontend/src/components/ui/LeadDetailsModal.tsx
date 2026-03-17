@@ -117,6 +117,7 @@ export function LeadDetailsModal({ details, onClose, onRefresh }: LeadDetailsMod
   const score = details.pipeline?.score ?? 0
   const probability = details.deal?.probabilidade ?? 0
   const etapa = details.pipeline?.etapa ?? 'Novo Lead'
+  const canShowSendEmail = etapa === 'Contato Inicial'
   const temperatura = details.pipeline?.temperatura ?? 'Nao definida'
   const company = lead.empresa ?? lead.nome ?? 'Sem empresa'
   const leadName = lead.nome ?? company
@@ -130,9 +131,13 @@ export function LeadDetailsModal({ details, onClose, onRefresh }: LeadDetailsMod
   const latestInteraction = details.interactions[0] ?? null
   const [saving, setSaving] = useState(false)
   const [updatingInteractionId, setUpdatingInteractionId] = useState<string | null>(null)
+  const [sendingWebhook, setSendingWebhook] = useState(false)
+  const [showEmailConfirm, setShowEmailConfirm] = useState(false)
+  const [emailFeedback, setEmailFeedback] = useState('')
+  const [emailError, setEmailError] = useState('')
   const [interactionFeedback, setInteractionFeedback] = useState('')
   const [interactionError, setInteractionError] = useState('')
-  const [activeTab, setActiveTab] = useState<'visao' | 'edicao' | 'acoes'>('visao')
+  const [activeTab, setActiveTab] = useState<'visao' | 'edicao' | 'acoes' | 'email'>('visao')
 
   const [profileForm, setProfileForm] = useState({
     nome: lead.nome ?? '',
@@ -257,6 +262,34 @@ export function LeadDetailsModal({ details, onClose, onRefresh }: LeadDetailsMod
     }
   }
 
+  async function confirmSendEmail() {
+    setEmailFeedback('')
+    setEmailError('')
+    setSendingWebhook(true)
+    try {
+      await api.post(`/kanban/leads/${lead.id}/send-email`)
+      setShowEmailConfirm(false)
+      setEmailFeedback('Webhook enviado com sucesso.')
+    } catch (error) {
+      const message =
+        typeof error === 'object' &&
+        error !== null &&
+        'response' in error &&
+        typeof error.response === 'object' &&
+        error.response !== null &&
+        'data' in error.response &&
+        typeof error.response.data === 'object' &&
+        error.response.data !== null &&
+        'message' in error.response.data &&
+        typeof error.response.data.message === 'string'
+          ? error.response.data.message
+          : 'Nao foi possivel enviar para o webhook.'
+      setEmailError(message)
+    } finally {
+      setSendingWebhook(false)
+    }
+  }
+
   return (
     <div className="modal-backdrop">
       <div className="modal details-modal">
@@ -300,6 +333,15 @@ export function LeadDetailsModal({ details, onClose, onRefresh }: LeadDetailsMod
           >
             Interacoes e cadencias
           </button>
+          {canShowSendEmail ? (
+            <button
+              type="button"
+              className={activeTab === 'email' ? 'details-tab active' : 'details-tab'}
+              onClick={() => setActiveTab('email')}
+            >
+              Enviar email
+            </button>
+          ) : null}
         </nav>
 
         <section className="details-summary">
@@ -721,6 +763,61 @@ export function LeadDetailsModal({ details, onClose, onRefresh }: LeadDetailsMod
               </button>
             </section>
           </>
+        ) : null}
+
+        {activeTab === 'email' && canShowSendEmail ? (
+          <section className="details-block details-single-focus">
+            <h4>Enviar email</h4>
+            <p className="muted-text">
+              Esse envio dispara o webhook com a empresa e o email do lead.
+            </p>
+            <div className="lead-info-grid" style={{ marginTop: '0.8rem' }}>
+              <article className="lead-info-item">
+                <span>Empresa</span>
+                <strong>{company}</strong>
+              </article>
+              <article className="lead-info-item">
+                <span>Email</span>
+                <strong>{lead.email ?? 'Nao informado'}</strong>
+              </article>
+            </div>
+            <div className="edit-actions">
+              <button
+                type="button"
+                className="ghost"
+                onClick={() => {
+                  setEmailFeedback('')
+                  setEmailError('')
+                  setShowEmailConfirm(true)
+                }}
+                disabled={sendingWebhook}
+              >
+                Enviar email
+              </button>
+            </div>
+            {emailFeedback ? <p className="success-text">{emailFeedback}</p> : null}
+            {emailError ? <p className="error-text">{emailError}</p> : null}
+          </section>
+        ) : null}
+
+        {showEmailConfirm ? (
+          <div className="modal-backdrop">
+            <div className="modal">
+              <h3>Confirmar envio</h3>
+              <p>
+                Deseja enviar para o webhook os dados da empresa <strong>{company}</strong> e email{' '}
+                <strong>{lead.email ?? 'Nao informado'}</strong>?
+              </p>
+              <div className="modal-actions">
+                <button type="button" className="ghost" onClick={() => setShowEmailConfirm(false)}>
+                  Cancelar
+                </button>
+                <button type="button" onClick={confirmSendEmail} disabled={sendingWebhook}>
+                  Conformar envio
+                </button>
+              </div>
+            </div>
+          </div>
         ) : null}
       </div>
     </div>

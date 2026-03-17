@@ -753,6 +753,40 @@ export async function updateLeadInteractionStatus(
   return update.data
 }
 
+export async function sendLeadEmailWebhook(userId: string, leadId: string) {
+  void userId
+
+  const leadQuery = await supabaseAdmin
+    .from('leads_prospect')
+    .select('id, nome, empresa, email')
+    .eq('id', leadId)
+    .single()
+
+  if (leadQuery.error || !leadQuery.data) {
+    throw new AppError('Lead não encontrado.', 404)
+  }
+
+  const companyName = leadQuery.data.empresa ?? leadQuery.data.nome
+  if (!companyName || !leadQuery.data.email) {
+    throw new AppError('Lead precisa ter empresa e email para envio.', 400)
+  }
+
+  const webhookResponse = await fetch('https://app.eusousocial.com/webhook-test/prospect', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      empresa: companyName,
+      email: leadQuery.data.email,
+    }),
+  })
+
+  if (!webhookResponse.ok) {
+    throw new AppError('Falha ao enviar dados para o webhook.', 502)
+  }
+
+  return { success: true }
+}
+
 export async function addLeadCadence(
   userId: string,
   leadId: string,
