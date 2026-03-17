@@ -771,7 +771,7 @@ export async function sendLeadEmailWebhook(userId: string, leadId: string) {
     throw new AppError('Lead precisa ter empresa e email para envio.', 400)
   }
 
-  const webhookResponse = await fetch('https://app.eusousocial.com/webhook-test/prospect', {
+  const webhookResponse = await fetch('https://app.eusousocial.com/webhook/prospect', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -781,7 +781,11 @@ export async function sendLeadEmailWebhook(userId: string, leadId: string) {
   })
 
   if (!webhookResponse.ok) {
-    throw new AppError('Falha ao enviar dados para o webhook.', 502)
+    const responseText = await webhookResponse.text()
+    throw new AppError(
+      `Falha ao enviar dados para o webhook (status ${webhookResponse.status}). ${responseText || ''}`.trim(),
+      502,
+    )
   }
 
   return { success: true }
